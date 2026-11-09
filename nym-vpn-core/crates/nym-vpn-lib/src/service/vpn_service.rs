@@ -51,7 +51,7 @@ use nym_vpn_lib_types::SplitTunnelExcludedProcess;
 #[cfg(any(target_os = "linux", target_os = "macos"))]
 use nym_vpn_lib_types::SplitTunnelExcludedProcessList;
 use nym_vpn_lib_types::{
-    AccountBalanceResponse, AccountCommandError, AccountControllerState, AppCompatibility,
+    AccountBalanceResponse, AccountControllerError, AccountControllerState, AppCompatibility,
     AutologinResponse, DeeplinkClient, DeeplinkKind, DiagnosticRegisterParams, DiagnosticReport,
     DiagnosticRunParams, DnsServer, EnableSocks5Request, EntryPoint, ExitPoint, FeatureFlags,
     Gateway, GetDeeplinkParams, ListGatewaysOptions, LogPath, LookupGatewayFilters,
@@ -172,39 +172,39 @@ pub enum VpnServiceCommand {
     GetTunnelState(oneshot::Sender<TunnelState>, ()),
     #[cfg(any(target_os = "android", target_os = "ios"))]
     RegisterAccount(
-        oneshot::Sender<Result<RegisterAccountResponse, AccountCommandError>>,
+        oneshot::Sender<Result<RegisterAccountResponse, AccountControllerError>>,
         RegisterAccountRequest,
     ),
     CreateAccount(
-        oneshot::Sender<Result<(), AccountCommandError>>,
+        oneshot::Sender<Result<(), AccountControllerError>>,
         ClientRequest<()>,
     ),
     StoreAccount(
-        oneshot::Sender<Result<(), AccountCommandError>>,
+        oneshot::Sender<Result<(), AccountControllerError>>,
         ClientRequest<StoreAccountRequest>,
     ),
     GetStoredMnemonic(
-        oneshot::Sender<Result<String, AccountCommandError>>,
+        oneshot::Sender<Result<String, AccountControllerError>>,
         ClientRequest<()>,
     ),
     DecentralisedBalance(oneshot::Sender<AccountBalanceResponse>, ()),
-    DecentralisedObtainTicketbooks(oneshot::Sender<Result<(), AccountCommandError>>, ()),
+    DecentralisedObtainTicketbooks(oneshot::Sender<Result<(), AccountControllerError>>, ()),
     IsAccountStored(oneshot::Sender<bool>, ()),
     ForgetAccount(
-        oneshot::Sender<Result<(), AccountCommandError>>,
+        oneshot::Sender<Result<(), AccountControllerError>>,
         ClientRequest<()>,
     ),
     DeleteAccount(
-        oneshot::Sender<Result<(), AccountCommandError>>,
+        oneshot::Sender<Result<(), AccountControllerError>>,
         ClientRequest<()>,
     ),
-    RotateKeys(oneshot::Sender<Result<(), AccountCommandError>>, ()),
+    RotateKeys(oneshot::Sender<Result<(), AccountControllerError>>, ()),
     GetAccountIdentity(
-        oneshot::Sender<Result<Option<String>, AccountCommandError>>,
+        oneshot::Sender<Result<Option<String>, AccountControllerError>>,
         (),
     ),
     GetCanonicalAccountIdentity(
-        oneshot::Sender<Result<Option<String>, AccountCommandError>>,
+        oneshot::Sender<Result<Option<String>, AccountControllerError>>,
         (),
     ),
     GetAccountMode(oneshot::Sender<Option<StoredAccountMode>>, ()),
@@ -215,23 +215,24 @@ pub enum VpnServiceCommand {
     GetAccountState(oneshot::Sender<AccountControllerState>, ()),
     RefreshAccountState(oneshot::Sender<()>, bool),
     GetAccountUsage(
-        oneshot::Sender<Result<Vec<NymVpnUsage>, AccountCommandError>>,
+        oneshot::Sender<Result<Vec<NymVpnUsage>, AccountControllerError>>,
         (),
     ),
     ResetDeviceIdentity(
-        oneshot::Sender<Result<(), AccountCommandError>>,
+        oneshot::Sender<Result<(), AccountControllerError>>,
         ClientRequest<Option<Seed>>,
     ),
+    RegisterDevice(oneshot::Sender<Result<(), AccountControllerError>>, ()),
     GetDeviceIdentity(
-        oneshot::Sender<Result<Option<String>, AccountCommandError>>,
+        oneshot::Sender<Result<Option<String>, AccountControllerError>>,
         (),
     ),
     GetDevices(
-        oneshot::Sender<Result<Vec<NymVpnDevice>, AccountCommandError>>,
+        oneshot::Sender<Result<Vec<NymVpnDevice>, AccountControllerError>>,
         ClientRequest<()>,
     ),
     GetActiveDevices(
-        oneshot::Sender<Result<Vec<NymVpnDevice>, AccountCommandError>>,
+        oneshot::Sender<Result<Vec<NymVpnDevice>, AccountControllerError>>,
         ClientRequest<()>,
     ),
     GetAvailableTickets(
@@ -240,36 +241,36 @@ pub enum VpnServiceCommand {
     ),
     RestockTicketbooks(oneshot::Sender<Result<(), BandwidthControllerError>>, ()),
     GetAccountSummary(
-        oneshot::Sender<Result<Option<VpnAccountSummary>, AccountCommandError>>,
+        oneshot::Sender<Result<Option<VpnAccountSummary>, AccountControllerError>>,
         (),
     ),
-    HandleSubscriptionPayment(oneshot::Sender<Result<(), AccountCommandError>>, ()),
-    IsTrialEligible(oneshot::Sender<Result<bool, AccountCommandError>>, ()),
+    HandleSubscriptionPayment(oneshot::Sender<Result<(), AccountControllerError>>, ()),
+    IsTrialEligible(oneshot::Sender<Result<bool, AccountControllerError>>, ()),
     GetDeeplink(
-        oneshot::Sender<Result<String, AccountCommandError>>,
+        oneshot::Sender<Result<String, AccountControllerError>>,
         GetDeeplinkParams,
     ),
     GetAutologinDeeplink(
-        oneshot::Sender<Result<AutologinResponse, AccountCommandError>>,
+        oneshot::Sender<Result<AutologinResponse, AccountControllerError>>,
         ClientRequest<GetDeeplinkParams>,
     ),
     DeeplinkStoreAccount(
-        oneshot::Sender<Result<(), AccountCommandError>>,
+        oneshot::Sender<Result<(), AccountControllerError>>,
         ClientRequest<String>,
     ),
     StartPairing(
-        oneshot::Sender<Result<QrUrl, AccountCommandError>>,
+        oneshot::Sender<Result<QrUrl, AccountControllerError>>,
         ClientRequest<()>,
     ),
     ScannedKey(
-        oneshot::Sender<Result<QrPairingConfirmation, AccountCommandError>>,
+        oneshot::Sender<Result<QrPairingConfirmation, AccountControllerError>>,
         String,
     ),
     VerifiedPairingPin(
-        oneshot::Sender<Result<(), AccountCommandError>>,
+        oneshot::Sender<Result<(), AccountControllerError>>,
         ClientRequest<u32>,
     ),
-    CancelPairingProcess(oneshot::Sender<Result<(), AccountCommandError>>, ()),
+    CancelPairingProcess(oneshot::Sender<Result<(), AccountControllerError>>, ()),
     GetLogPath(oneshot::Sender<Option<LogPath>>, ()),
     DeleteLogFile(oneshot::Sender<()>, ()),
     IsSentryEnabled(oneshot::Sender<bool>, ()),
@@ -290,6 +291,16 @@ pub enum VpnServiceCommand {
         DiagnosticRegisterParams,
     ),
     GetTentativeGateways(oneshot::Sender<TentativeGateways>, ()),
+    #[cfg(any(target_os = "ios", target_os = "android"))]
+    UnlockKeychain(
+        oneshot::Sender<Result<(), nym_secure_enclave::SecureEnclaveError>>,
+        String,
+    ),
+    #[cfg(any(target_os = "ios", target_os = "android"))]
+    LockKeychain(
+        oneshot::Sender<Result<(), nym_secure_enclave::SecureEnclaveError>>,
+        (),
+    ),
     GetRecentGateways(
         oneshot::Sender<Result<RecentGateways, ListGatewaysError>>,
         TunnelType,
@@ -344,6 +355,8 @@ pub struct NymVpnServiceParameters {
     pub tun_provider: Arc<dyn OSTunProvider>,
     #[cfg(target_os = "android")]
     pub tun_provider: Arc<dyn AndroidTunProvider>,
+    #[cfg(target_os = "android")]
+    pub secure_enclave_provider: Arc<dyn nym_secure_enclave::AndroidSecureEnclaveProvider>,
     #[cfg(target_os = "android")]
     pub connectivity_monitor: Box<dyn nym_offline_monitor::NativeConnectivityAdapter + 'static>,
 }
@@ -467,6 +480,10 @@ pub struct NymVpnService {
     #[cfg(target_os = "linux")]
     split_tunnel_pid_manager: nym_split_tunnel::PidManager,
 
+    // Secure enclave shared with storage
+    #[cfg(any(target_os = "ios", target_os = "android"))]
+    secure_enclave: Arc<nym_secure_enclave::SecureEnclave>,
+
     // Unlocked with the authorization token obtained in the user's session
     #[cfg(target_os = "macos")]
     authorization_service: AuthorizationService,
@@ -551,7 +568,22 @@ impl NymVpnService {
             .await
             .map_err(Error::PathsSetup)?;
 
-        let storage = crate::storage::VpnClientOnDiskStorage::new(paths.network_data_dir.clone());
+        #[cfg(any(target_os = "ios", target_os = "macos", target_os = "android"))]
+        let secure_enclave = Arc::new(nym_secure_enclave::SecureEnclave::new(
+            #[cfg(target_os = "android")]
+            parameters.secure_enclave_provider,
+        ));
+
+        #[cfg(target_os = "macos")]
+        if let Err(err) = AuthorizationService::register_unlock_right() {
+            tracing::error!("Failed to register keychain unlock right: {err}");
+        }
+
+        let storage = crate::storage::VpnClientOnDiskStorage::new(
+            paths.network_data_dir.clone(),
+            #[cfg(any(target_os = "ios", target_os = "macos", target_os = "android"))]
+            secure_enclave.clone(),
+        );
 
         let state_machine_shutdown_token = CancellationToken::new();
         let services_shutdown_token = CancellationToken::new();
@@ -889,6 +921,8 @@ impl NymVpnService {
             recents_manager,
             #[cfg(target_os = "linux")]
             split_tunnel_pid_manager,
+            #[cfg(any(target_os = "ios", target_os = "android"))]
+            secure_enclave,
             #[cfg(target_os = "macos")]
             authorization_service: AuthorizationService::default(),
         })
@@ -1305,6 +1339,9 @@ impl NymVpnService {
                         .await,
                 );
             }
+            VpnServiceCommand::RegisterDevice(tx, ()) => {
+                let _ = tx.send(self.account_command_tx.register_device().await);
+            }
             VpnServiceCommand::GetDeviceIdentity(tx, ()) => {
                 let _ = tx.send(self.handle_get_device_identity().await);
             }
@@ -1411,6 +1448,14 @@ impl NymVpnService {
             }
             VpnServiceCommand::GetTentativeGateways(tx, _) => {
                 let _ = tx.send(self.handle_get_tentative_gateways().await);
+            }
+            #[cfg(any(target_os = "ios", target_os = "android"))]
+            VpnServiceCommand::UnlockKeychain(tx, reason) => {
+                self.handle_unlock_keychain(reason, tx);
+            }
+            #[cfg(any(target_os = "ios", target_os = "android"))]
+            VpnServiceCommand::LockKeychain(tx, ()) => {
+                let _ = tx.send(self.secure_enclave.lock().await);
             }
             #[cfg(target_os = "macos")]
             VpnServiceCommand::Authorize(tx, (token, client)) => {
@@ -2094,12 +2139,12 @@ impl NymVpnService {
     async fn handle_register_account(
         &self,
         request: RegisterAccountRequest,
-    ) -> Result<RegisterAccountResponse, AccountCommandError> {
+    ) -> Result<RegisterAccountResponse, AccountControllerError> {
         let stored_account = self
             .account_command_tx
             .get_stored_account()
             .await?
-            .ok_or(AccountCommandError::NoAccountStored)?;
+            .ok_or(AccountControllerError::NoAccountStored)?;
 
         self.account_command_tx
             .register_account(
@@ -2111,13 +2156,13 @@ impl NymVpnService {
 
     /// On macOS, fails unless `client` is the client that authorized the service. Requests without
     /// a known client are rejected.
-    fn ensure_authorized(&self, _client: Option<Client>) -> Result<(), AccountCommandError> {
+    fn ensure_authorized(&self, _client: Option<Client>) -> Result<(), AccountControllerError> {
         #[cfg(target_os = "macos")]
         {
             if _client.is_some_and(|client| self.authorization_service.is_authorized(&client)) {
                 Ok(())
             } else {
-                Err(AccountCommandError::UserPresenceRequired)
+                Err(AccountControllerError::UserPresenceRequired)
             }
         }
 
@@ -2130,7 +2175,7 @@ impl NymVpnService {
     async fn handle_create_account(
         &self,
         client: Option<Client>,
-    ) -> Result<(), AccountCommandError> {
+    ) -> Result<(), AccountControllerError> {
         self.ensure_authorized(client)?;
         self.account_command_tx.create_account_command().await
     }
@@ -2139,23 +2184,23 @@ impl NymVpnService {
         &mut self,
         store_request: StoreAccountRequest,
         client: Option<Client>,
-    ) -> Result<(), AccountCommandError> {
+    ) -> Result<(), AccountControllerError> {
         self.ensure_authorized(client)?;
         let account = StorableAccount::try_from(store_request)
-            .map_err(|err| AccountCommandError::InvalidSecret(err.to_string()))?;
+            .map_err(|err| AccountControllerError::InvalidSecret(err.to_string()))?;
         self.account_command_tx.store_account(account).await
     }
 
     async fn handle_get_stored_mnemonic(
         &mut self,
         client: Option<Client>,
-    ) -> Result<String, AccountCommandError> {
+    ) -> Result<String, AccountControllerError> {
         self.ensure_authorized(client)?;
         let stored_account = self
             .account_command_tx
             .get_stored_account()
             .await?
-            .ok_or(AccountCommandError::NoAccountStored)?;
+            .ok_or(AccountControllerError::NoAccountStored)?;
 
         Ok(stored_account.mnemonic.to_string())
     }
@@ -2170,7 +2215,9 @@ impl NymVpnService {
         }
     }
 
-    async fn handle_decentralised_obtain_ticketbooks(&mut self) -> Result<(), AccountCommandError> {
+    async fn handle_decentralised_obtain_ticketbooks(
+        &mut self,
+    ) -> Result<(), AccountControllerError> {
         tracing::info!("received request to ensure enough ticketbooks of each type");
 
         self.account_command_tx
@@ -2189,10 +2236,10 @@ impl NymVpnService {
     async fn handle_forget_account(
         &mut self,
         client: Option<Client>,
-    ) -> Result<(), AccountCommandError> {
+    ) -> Result<(), AccountControllerError> {
         self.ensure_authorized(client)?;
         if *self.tunnel_state.borrow() != TunnelState::Disconnected {
-            return Err(AccountCommandError::internal(
+            return Err(AccountControllerError::internal(
                 "Unable to forget account while connected",
             ));
         }
@@ -2215,10 +2262,10 @@ impl NymVpnService {
     async fn handle_delete_account(
         &mut self,
         client: Option<Client>,
-    ) -> Result<(), AccountCommandError> {
+    ) -> Result<(), AccountControllerError> {
         self.ensure_authorized(client)?;
         if *self.tunnel_state.borrow() != TunnelState::Disconnected {
-            return Err(AccountCommandError::internal(
+            return Err(AccountControllerError::internal(
                 "Unable to delete account while connected",
             ));
         }
@@ -2240,10 +2287,10 @@ impl NymVpnService {
         Ok(())
     }
 
-    async fn handle_rotate_keys(&mut self) -> Result<(), AccountCommandError> {
+    async fn handle_rotate_keys(&mut self) -> Result<(), AccountControllerError> {
         // TODO: temporary, until key rotation can be done while connected
         if *self.tunnel_state.borrow() != TunnelState::Disconnected {
-            return Err(AccountCommandError::internal(
+            return Err(AccountControllerError::internal(
                 "Unable to rotate keys while connected",
             ));
         }
@@ -2251,13 +2298,13 @@ impl NymVpnService {
         self.account_command_tx.rotate_keys().await
     }
 
-    async fn handle_get_account_identity(&self) -> Result<Option<String>, AccountCommandError> {
+    async fn handle_get_account_identity(&self) -> Result<Option<String>, AccountControllerError> {
         self.account_command_tx.get_account_id().await
     }
 
     async fn handle_get_canonical_account_identity(
         &self,
-    ) -> Result<Option<String>, AccountCommandError> {
+    ) -> Result<Option<String>, AccountControllerError> {
         self.account_command_tx.get_canonical_account_id().await
     }
 
@@ -2300,7 +2347,7 @@ impl NymVpnService {
         let _ = self.account_command_tx.refresh_account_state(force).await;
     }
 
-    async fn handle_get_usage(&self) -> Result<Vec<NymVpnUsage>, AccountCommandError> {
+    async fn handle_get_usage(&self) -> Result<Vec<NymVpnUsage>, AccountControllerError> {
         self.account_command_tx
             .get_usage()
             .await
@@ -2311,10 +2358,10 @@ impl NymVpnService {
         &mut self,
         seed: Option<[u8; 32]>,
         client: Option<Client>,
-    ) -> Result<(), AccountCommandError> {
+    ) -> Result<(), AccountControllerError> {
         self.ensure_authorized(client)?;
         if *self.tunnel_state.borrow() != TunnelState::Disconnected {
-            return Err(AccountCommandError::internal(
+            return Err(AccountControllerError::internal(
                 "Unable to reset device identity while connected",
             ));
         }
@@ -2330,14 +2377,14 @@ impl NymVpnService {
         Ok(())
     }
 
-    async fn handle_get_device_identity(&self) -> Result<Option<String>, AccountCommandError> {
+    async fn handle_get_device_identity(&self) -> Result<Option<String>, AccountControllerError> {
         self.account_command_tx.get_device_identity().await
     }
 
     async fn handle_get_devices(
         &self,
         client: Option<Client>,
-    ) -> Result<Vec<NymVpnDevice>, AccountCommandError> {
+    ) -> Result<Vec<NymVpnDevice>, AccountControllerError> {
         self.ensure_authorized(client)?;
         Ok(self
             .account_command_tx
@@ -2351,7 +2398,7 @@ impl NymVpnService {
     async fn handle_get_active_devices(
         &self,
         client: Option<Client>,
-    ) -> Result<Vec<NymVpnDevice>, AccountCommandError> {
+    ) -> Result<Vec<NymVpnDevice>, AccountControllerError> {
         self.ensure_authorized(client)?;
         Ok(self
             .account_command_tx
@@ -2375,20 +2422,20 @@ impl NymVpnService {
 
     async fn handle_get_account_summary(
         &self,
-    ) -> Result<Option<VpnAccountSummary>, AccountCommandError> {
+    ) -> Result<Option<VpnAccountSummary>, AccountControllerError> {
         self.account_command_tx.get_account_summary().await
     }
 
-    async fn handle_subscription_payment(&self) -> Result<(), AccountCommandError> {
+    async fn handle_subscription_payment(&self) -> Result<(), AccountControllerError> {
         if !self.handle_is_account_stored().await {
-            return Err(AccountCommandError::NoAccountStored);
+            return Err(AccountControllerError::NoAccountStored);
         }
         self.account_command_tx.refresh_account_state(true).await
     }
 
     fn handle_is_trial_eligible(
         &self,
-        completion_tx: oneshot::Sender<Result<bool, AccountCommandError>>,
+        completion_tx: oneshot::Sender<Result<bool, AccountControllerError>>,
     ) {
         let account_command_tx = self.account_command_tx.clone();
 
@@ -2402,14 +2449,14 @@ impl NymVpnService {
     async fn handle_get_deeplink(
         &self,
         params: GetDeeplinkParams,
-    ) -> Result<String, AccountCommandError> {
+    ) -> Result<String, AccountControllerError> {
         let account_management = self
             .network_tx
             .borrow()
             .nym_vpn_network
             .account_management
             .clone()
-            .ok_or(AccountCommandError::DeeplinkError(
+            .ok_or(AccountControllerError::DeeplinkError(
                 "No account management data is available at this time".to_string(),
             ))?;
 
@@ -2420,17 +2467,17 @@ impl NymVpnService {
                     DeeplinkClient::Desktop => account_management.privy_desktop_url(&params.locale),
                     DeeplinkClient::Web => account_management.privy_web_url(&params.locale),
                 };
-                url.ok_or(AccountCommandError::DeeplinkError(
+                url.ok_or(AccountControllerError::DeeplinkError(
                     "The privy path could not be determined".to_string(),
                 ))?
             }
             DeeplinkKind::CreateAccount => account_management.pricing_url(&params.locale).ok_or(
-                AccountCommandError::DeeplinkError(
+                AccountControllerError::DeeplinkError(
                     "The create account path could not be determined".to_string(),
                 ),
             )?,
             _ => {
-                return Err(AccountCommandError::DeeplinkError(
+                return Err(AccountControllerError::DeeplinkError(
                     "Invalid deeplink kind".to_string(),
                 ));
             }
@@ -2442,10 +2489,10 @@ impl NymVpnService {
     }
 
     async fn handle_get_autologin_deeplink(
-        &self,
+        &mut self,
         params: GetDeeplinkParams,
         client: Option<Client>,
-    ) -> Result<AutologinResponse, AccountCommandError> {
+    ) -> Result<AutologinResponse, AccountControllerError> {
         self.ensure_authorized(client)?;
         let account_management = self
             .network_tx
@@ -2453,7 +2500,7 @@ impl NymVpnService {
             .nym_vpn_network
             .account_management
             .clone()
-            .ok_or(AccountCommandError::DeeplinkError(
+            .ok_or(AccountControllerError::DeeplinkError(
                 "No account management data is available at this time".to_string(),
             ))?;
 
@@ -2463,7 +2510,7 @@ impl NymVpnService {
             DeeplinkClient::Web => account_management.autologin_web_url(&params.locale),
         };
 
-        let base_url = opt_url.ok_or(AccountCommandError::DeeplinkError(
+        let base_url = opt_url.ok_or(AccountControllerError::DeeplinkError(
             "The autologin path could not be determined".to_string(),
         ))?;
 
@@ -2473,10 +2520,10 @@ impl NymVpnService {
     }
 
     async fn handle_deeplink_store_account(
-        &self,
+        &mut self,
         deeplink_url: String,
         client: Option<Client>,
-    ) -> Result<(), AccountCommandError> {
+    ) -> Result<(), AccountControllerError> {
         self.ensure_authorized(client)?;
         let deeplink_mnemonic = self
             .account_command_tx
@@ -2493,7 +2540,7 @@ impl NymVpnService {
                 self.account_command_tx.store_account(account).await
             }
             DeeplinkKind::PrivyLink => self.account_command_tx.link_account(account).await,
-            _ => Err(AccountCommandError::DeeplinkError(
+            _ => Err(AccountControllerError::DeeplinkError(
                 "Invalid deeplink kind".to_string(),
             )),
         }
@@ -2502,7 +2549,7 @@ impl NymVpnService {
     async fn handle_start_pairing(
         &self,
         client: Option<Client>,
-    ) -> Result<QrUrl, AccountCommandError> {
+    ) -> Result<QrUrl, AccountControllerError> {
         self.ensure_authorized(client)?;
         self.account_command_tx.start_pairing().await
     }
@@ -2510,22 +2557,22 @@ impl NymVpnService {
     async fn handle_scanned_key(
         &self,
         pub_key: String,
-    ) -> Result<QrPairingConfirmation, AccountCommandError> {
+    ) -> Result<QrPairingConfirmation, AccountControllerError> {
         self.account_command_tx.scanned_key(pub_key).await
     }
 
     async fn handle_verified_pairing_pin(
-        &self,
+        &mut self,
         session_id: u32,
         client: Option<Client>,
-    ) -> Result<(), AccountCommandError> {
+    ) -> Result<(), AccountControllerError> {
         self.ensure_authorized(client)?;
         self.account_command_tx
             .verified_pairing_pin(session_id)
             .await
     }
 
-    async fn handle_cancel_pairing_process(&self) -> Result<(), AccountCommandError> {
+    async fn handle_cancel_pairing_process(&self) -> Result<(), AccountControllerError> {
         self.account_command_tx.cancel_pairing_process().await
     }
 
@@ -2593,6 +2640,22 @@ impl NymVpnService {
         &mut self,
     ) -> Result<NetworkStatisticsIdentity, StatisticsControllerError> {
         self.stats_control_commands_sender.get_seed().await
+    }
+
+    #[cfg(any(target_os = "ios", target_os = "android"))]
+    fn handle_unlock_keychain(
+        &self,
+        reason: String,
+        completion_tx: oneshot::Sender<Result<(), nym_secure_enclave::SecureEnclaveError>>,
+    ) {
+        let secure_enclave = self.secure_enclave.clone();
+
+        // Spawned because the user may take a while to respond to the authentication prompt.
+        tokio::spawn(async move {
+            completion_tx
+                .send(secure_enclave.unlock(&reason).await)
+                .ok();
+        });
     }
 
     fn handle_run_diagnostic(
